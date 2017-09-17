@@ -1,0 +1,5 @@
+{
+  "DefaultEmailOption": "CONFIRM_WITH_LINK",
+  "EmailMessageByLink": "Please click the link below to verify your email address. {##Verify Email##} ",
+  "EmailSubjectByLink": "Your verification link"
+}

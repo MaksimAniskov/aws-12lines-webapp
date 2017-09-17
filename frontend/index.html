@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        CognitoClientId = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
+        ApiGatewayEndpoint = "https://xxxxxxxxxx.execute-api.eu-west-1.amazonaws.com/prod";
+        CognitoHostedPagesUri = "https://xxxxxxxxxxxxxx.auth.eu-west-1.amazoncognito.com";
+        RedirectUri = "https://aniskov.com/aws-12lines-webapp/";
+    </script>
+
+    <meta charset="utf-8">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <meta content="width=device-width,initial-scale=1" name="viewport">
+    <meta content="AWS Cognito and serverless backend demo" name="description">
+    <meta content="AWS,Amazon Web Services,Cognito,API Gateway,Lambda,Serveless" name="keywords">
+    <meta content="Maksim Aniskov" name="author">
+    <title>Just-a-dozen-lines webapp on AWS</title>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+          crossorigin="anonymous"
+    >
+    <style>
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="container">
+
+<header>
+    <h1>AWS Cognito and serverless backend demo</h1>
+    <p>
+        With help of Amazon Web Services you can spin up your web application with just a few lines of code.
+    </p>
+    <p>
+        This demo really has only a dozen of lines, though it's ready for Wild Wild Web.
+        <br/>It implements user sign-up and email verification.
+        <br/>It protects backend from unauthorized access.
+        <br/>It's scalable.
+    </p>
+    <p>
+        In this demo we use following features AWS features:
+    </p>
+    <ul>
+        <li>Cognito User Pool</li>
+        <li>Cognito hosted sign-up/sign-in pages</li>
+        <li>API Gateway with Cognito authorizer</li>
+        <li>Lambda function</li>
+        <li>S3 for hosting front-end</li>
+    </ul>
+    <p>
+        What's out of scope:
+    </p>
+    <ul>
+        <li>Login with Facebook, Google, Amazon</li>
+        <li>Cognito hosted UI customization: logo, styling</li>
+    </ul>
+</header>
+
+<section class="jumbotron">
+    <a id="btnLogin" class="btn btn-default btn-lg hidden">
+        Login
+    </a>
+
+    <button id="btnInvokeBackend" class="btn btn-default btn-lg" disabled onClick="invokeApi();">
+        Invoke back-end
+    </button>
+
+    <a id="btnLogout" class="btn btn-default btn-lg hidden">
+        Logout
+    </a>
+</section>
+
+<section id="resultPane" class="alert alert-success hidden" role="alert">
+</section>
+
+<section id="errorPane" class="alert alert-danger hidden" role="alert">
+</section>
+
+<footer>
+    <p>Copyright (c) 2017 Maksim Aniskov
+        <a href="https://github.com/MaksimAniskov/aws-12lines-webapp/blob/master/LICENSE" target="_blank">
+            MIT License
+        </a>
+    </p>
+    <p>Check out <a href="https://github.com/MaksimAniskov/aws-12lines-webapp" target="_blank">source code on GitHub</a>.
+    </p>
+    <p>Feel free to drop me a line at <a href="mailto:MaksimAniskov@gmail.com">MaksimAniskov@gmail.com</a></p>
+</footer>
+
+</body>
+<script>
+    const queryStringParams = parseQueryParams(window.location.search.substring(1));
+    const btnLogin = document.getElementById('btnLogin');
+    const btnLogout = document.getElementById('btnLogout');
+    const btnInvokeBackend = document.getElementById('btnInvokeBackend');
+    const resultPane = document.getElementById('resultPane');
+    const errorPane = document.getElementById('errorPane');
+    let idToken;
+
+    btnLogin.setAttribute(
+        'href',
+        CognitoHostedPagesUri + "/login?" +
+        "response_type=code" +
+        "&client_id=" + CognitoClientId +
+        "&redirect_uri=" + RedirectUri
+    );
+
+    btnLogout.setAttribute(
+        'href',
+        CognitoHostedPagesUri + "/logout?" +
+        "&client_id=" + CognitoClientId +
+        "&logout_uri=" + RedirectUri
+    );
+
+    if (!queryStringParams.code) {
+        btnLogin.classList.remove('hidden');
+    } else {
+        const http = new XMLHttpRequest();
+        http.open("POST", CognitoHostedPagesUri + "/oauth2/token", true);
+        http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+        http.onreadystatechange = onReadyStateChange;
+        http.send(
+            "grant_type=authorization_code" +
+            "&client_id=" + CognitoClientId +
+            "&redirect_uri=" + RedirectUri +
+            "&code=" + queryStringParams.code
+        );
+
+        function onReadyStateChange(event) {
+            const http = event.target;
+            if (http.readyState !== 4) {
+                return;
+            }
+            if (http.status === 200) {
+                idToken = JSON.parse(http.responseText).id_token;
+                btnInvokeBackend.removeAttribute('disabled');
+                btnLogout.classList.remove('hidden');
+            } else {
+                let errorMessage = http.statusText;
+                try {
+                    const response = JSON.parse(http.responseText);
+                    if (response && response.error) {
+                        errorMessage = response.error;
+                    }
+                } catch (e) {
+                }
+                showError(errorMessage);
+                btnLogin.classList.remove('hidden');
+            }
+        }
+    }
+
+    function invokeApi() {
+        resultPane.classList.add('hidden');
+        errorPane.classList.add('hidden');
+
+        const http = new XMLHttpRequest();
+        http.open("GET", ApiGatewayEndpoint, true);
+        http.setRequestHeader("Authorization", idToken);
+        http.onreadystatechange = onReadyStateChange;
+        http.send();
+
+        function onReadyStateChange(event) {
+            const http = event.target;
+            if (http.readyState !== 4) {
+                return;
+            }
+            if (http.status === 200) {
+                resultPane.innerHTML = JSON.parse(http.responseText);
+                resultPane.classList.remove('hidden');
+            } else {
+                showError(http.statusText);
+            }
+        }
+    }
+
+    function parseQueryParams(queryString) {
+        const result = {};
+        queryString
+            .split('&')
+            .map(function (equation) {
+                const pair = equation.split('=');
+                result[pair[0]] = pair[1];
+            });
+        return result;
+    }
+
+    function showError(message) {
+        errorPane.innerHTML = message;
+        errorPane.classList.remove('hidden');
+    }
+
+</script>
+</html>
