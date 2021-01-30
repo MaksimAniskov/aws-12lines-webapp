@@ -1,4 +1,4 @@
-# © 2017 Maksim Aniskov MaksimAniskov@gmail.com MIT License
+# © 2017-2021 Maksim Aniskov MaksimAniskov@gmail.com MIT License
 
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
@@ -104,6 +104,6 @@ Resources:
               Ref: Api
       CodeUri: lambda
       Handler: index.handler
-      Runtime: nodejs6.10
+      Runtime: nodejs12.x
       MemorySize: 128
       Timeout: 10
